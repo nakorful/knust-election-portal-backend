@@ -1,5 +1,7 @@
 package org.lynx.knustelectioncentre.v1.model.candidate;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.lynx.knustelectioncentre.v1.domain.Position;
 import org.lynx.knustelectioncentre.v1.model.vote.Vote;
 import org.springframework.data.annotation.CreatedDate;
@@ -10,6 +12,8 @@ import java.time.ZonedDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+@Setter
+@Getter
 @Entity
 public class Candidate {
 

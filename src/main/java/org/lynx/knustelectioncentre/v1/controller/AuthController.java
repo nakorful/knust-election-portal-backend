@@ -4,8 +4,12 @@ import org.lynx.knustelectioncentre.v1.domain.LoginRequest;
 import org.lynx.knustelectioncentre.v1.domain.Position;
 import org.lynx.knustelectioncentre.v1.domain.VoteRequest;
 import org.lynx.knustelectioncentre.v1.domain.VoteResults;
+import org.lynx.knustelectioncentre.v1.model.candidate.Candidate;
+import org.lynx.knustelectioncentre.v1.model.vote.Vote;
 import org.lynx.knustelectioncentre.v1.model.voter.Voter;
 import org.lynx.knustelectioncentre.v1.model.voter.VoterRepository;
+import org.lynx.knustelectioncentre.v1.service.CandidateService;
+import org.lynx.knustelectioncentre.v1.service.VoteService;
 import org.lynx.knustelectioncentre.v1.service.VoterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 @RestController
@@ -23,10 +28,20 @@ public class AuthController {
 
     private final VoterService voterService;
 
-    public AuthController(VoterService voterService) {
+    private final CandidateService candidateService;
+
+    private final VoteService voteService;
+
+    public AuthController(VoterService voterService,
+                          CandidateService candidateService,
+                          VoteService voteService) {
         Objects.requireNonNull(voterService, "voter service cannot be null");
+        Objects.requireNonNull(candidateService, "candidate service cannot be null");
+        Objects.requireNonNull(voteService, "vote service cannot be null");
 
         this.voterService = voterService;
+        this.candidateService = candidateService;
+        this.voteService = voteService;
     }
 
     @PostMapping("/api/v1/validate/studentId")
@@ -133,11 +148,65 @@ public class AuthController {
                 Voter voter = optVoter.get();
                 List<VoteResults> voteResults = voteRequest.getVoteResults();
 
-                // loop through votes
-                voteResults.forEach(voteResult -> {
-                    Position position = voteResult.getPosition();
-                    String candidateName = voteResult.getCandidateName();
-                });
+                if (voter.getHasVoted() != null && !voter.getHasVoted()) {
+                    // loop through votes
+                    voteResults.forEach(voteResult -> {
+                        Position position = voteResult.getPosition();
+                        String candidateName = voteResult.getCandidateName();
+
+                        Optional<Candidate> optCandidate = candidateService.findByName(candidateName);
+                        logger.info("[ " + requestId + " ] is candidate with name: " + candidateName + " present: " + optCandidate.isPresent());
+
+                        if (optCandidate.isPresent()) {
+                            Candidate candidate = optCandidate.get();
+                            //get candidate votes
+                            Set<Vote> votes = candidate.getVotes();
+                            Vote newVote = new Vote();
+                            newVote.setVoter(voter);
+                            newVote.setCandidate(candidate);
+                            newVote.setPosition(position);
+
+                            ZonedDateTime currentDate = ZonedDateTime.now();
+                            newVote.setCreatedOn(currentDate);
+                            newVote.setUpdatedOn(currentDate);
+
+                            boolean isSuccessful = false;
+                            try {
+                                newVote = this.voteService.save(newVote);
+                                isSuccessful = true;
+                            } catch (Exception e) {
+                                logger.warn("[ " + requestId + " ] an error occurred while persisting vote. message: " + e.getMessage());
+                            }
+
+                            if (isSuccessful) {
+                                votes.add(newVote);
+                                candidate.setVotes(votes);
+
+                                candidate.setUpdatedOn(currentDate);
+
+                                try {
+                                    candidate = candidateService.save(candidate);
+                                } catch (Exception e) {
+
+                                }
+
+                                if (newVote != null) {
+                                    Voter byWho = newVote.getVoter();
+                                    Set<Vote> allVotes = byWho.getVotes();
+                                    allVotes.add(newVote);
+
+                                    byWho.setVotes(allVotes);
+
+                                    try {
+                                        voterService.save(byWho);
+                                    } catch (Exception e) {
+
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
             } else {
 
             }

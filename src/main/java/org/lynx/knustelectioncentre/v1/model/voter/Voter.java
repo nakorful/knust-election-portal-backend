@@ -29,7 +29,7 @@ public class Voter {
 
     private String avatar;
 
-    private Boolean hasVoted;
+    private Boolean hasVoted = false;
 
     @OneToMany
     private Set<Vote> votes = new HashSet<>();

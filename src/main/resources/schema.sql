@@ -4,6 +4,7 @@ create TABLE IF NOT EXISTS `voter` (
     `password` varchar(255) NOT NULL,
     `username` varchar(255) NOT NULL,
     `avatar` varchar(255) NOT NULL,
+    `has_voted` boolean DEFAULT false,
     `created_on` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_on` TIMESTAMP DEFAULT  CURRENT_TIMESTAMP
 );
